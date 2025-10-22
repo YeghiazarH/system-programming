@@ -42,6 +42,14 @@ int main(int argc, char* argv[])
 		off_t dataStart = lseek(sourceFd, current, SEEK_DATA);
 		if (dataStart == -1)
 		{
+			if (errno == ENXIO)
+			{
+				// If there is no more data, only hole till the end
+				off_t holeSize = size - current;
+				hole += holeSize;
+				lseek(destFd, holeSize, SEEK_CUR);
+				break;
+			}
 			close(sourceFd);
 			close(destFd);
 			exit(errno);
