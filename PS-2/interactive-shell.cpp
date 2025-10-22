@@ -75,36 +75,57 @@ int DoCommand(string cmd, bool silent)
 
 void ProcessCommand(string& cmd, bool silent)
 {
-    // || case
-    size_t pos;
-    while ((pos = cmd.find("||")) != string::npos) {
-        string left = cmd.substr(0, pos);
-        cmd = cmd.substr(pos + 2);
-        if (DoCommand(left, silent) == 0)
-            return;
+    auto trim = [](string& s) {
+        s.erase(0, s.find_first_not_of(" \t"));
+        s.erase(s.find_last_not_of(" \t") + 1);
+    };
+
+    // Split by || first
+    vector<string> orCmds;
+    size_t pos = 0;
+    size_t found;
+    while ((found = cmd.find("||", pos)) != string::npos) {
+        string segment = cmd.substr(pos, found - pos);
+        trim(segment);
+        orCmds.push_back(segment);
+        pos = found + 2;
     }
-    
-    // && case
-    vector<string> andCmds;
-    stringstream ss(cmd);
-    string token;
-    while (getline(ss, token, '&')) {
-        if (!token.empty() && token[0] != '&')
-            andCmds.push_back(token);
-    }
-    
-    for (auto& c : andCmds) {
-        // ; case
-        stringstream ss2(c);
-        string scmd;
-        bool stop = false;
-        while (getline(ss2, scmd, ';')) {
-            if (DoCommand(scmd, silent) != 0) {
-                stop = true;
-                break;
-            }
+    string lastSeg = cmd.substr(pos);
+    trim(lastSeg);
+    orCmds.push_back(lastSeg);
+
+    // Process each || segment
+    for (auto& orCmd : orCmds) {
+        // Split by &&
+        vector<string> andCmds;
+        pos = 0;
+        while ((found = orCmd.find("&&", pos)) != string::npos) {
+            string segment = orCmd.substr(pos, found - pos);
+            trim(segment);
+            andCmds.push_back(segment);
+            pos = found + 2;
         }
-        if (stop) break;
+        lastSeg = orCmd.substr(pos);
+        trim(lastSeg);
+        andCmds.push_back(lastSeg);
+
+        bool allSuccess = true;
+        for (auto& andCmd : andCmds) {
+            // Split by ;
+            stringstream ss(andCmd);
+            string scmd;
+            while (getline(ss, scmd, ';')) {
+                trim(scmd);
+                if (!scmd.empty() && DoCommand(scmd, silent) != 0) {
+                    allSuccess = false;
+                    break;
+                }
+            }
+            if (!allSuccess) break;
+        }
+
+        // If any && chain succeeded, we're done (|| short-circuits)
+        if (allSuccess) return;
     }
 }
 
