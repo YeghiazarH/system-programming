@@ -36,6 +36,7 @@ int main(int argc, char* argv[])
 
 	char* buffer = (char*)malloc(BUFFER_SIZE);
 	off_t current = 0, size = lseek(sourceFd, 0, SEEK_END), hole = 0, data = 0;
+	lseek(sourceFd, 0, SEEK_SET);
 
 	while (current < size)
 	{
@@ -44,10 +45,6 @@ int main(int argc, char* argv[])
 		{
 			if (errno == ENXIO)
 			{
-				// If there is no more data, only hole till the end
-				off_t holeSize = size - current;
-				hole += holeSize;
-				lseek(destFd, holeSize, SEEK_CUR);
 				break;
 			}
 			close(sourceFd);
@@ -57,9 +54,7 @@ int main(int argc, char* argv[])
 
 		if (dataStart > current)
 		{
-			off_t holeSize = dataStart - current;
-			hole += holeSize;
-			lseek(destFd, holeSize, SEEK_CUR);
+			lseek(destFd, dataStart, SEEK_SET);
 		}
 
 		off_t holeStart = lseek(sourceFd, dataStart, SEEK_HOLE);
@@ -86,12 +81,18 @@ int main(int argc, char* argv[])
 				exit(errno);
 			}
 
-			if (write(destFd, buffer, readSize) == -1)
+			int wptr = 0;
+			while (wptr < readSize)
 			{
-				printf("Something went wrong while writing to destination file. Error %s\n", strerror(errno));
-				close(sourceFd);
-				close(destFd);
-				exit(errno);
+				int w = write(destFd, buffer + wptr, readSize - wptr);
+				if (w == -1)
+				{
+					printf("Something went wrong while writing to destination file. Error %s\n", strerror(errno));
+					close(sourceFd);
+					close(destFd);
+					exit(errno);
+				}
+				wptr += w;
 			}
 
 			copySize -= readSize;
@@ -100,12 +101,16 @@ int main(int argc, char* argv[])
 		current = holeStart;
 	}
 
-
+	if (size > 0)
+	{
+		ftruncate(destFd, size);
+	}
 
 	close(sourceFd);
 	close(destFd);
 	free(buffer);
 
+	hole = size - data;
 	printf("Successfully copied %lld bytes (data: %lld, hole: %lld).\n", (long long)size, (long long)data, (long long)hole);
 
 	return 0;
