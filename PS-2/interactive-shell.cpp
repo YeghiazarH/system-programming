@@ -75,16 +75,16 @@ int DoCommand(string cmd, bool silent)
 
 void ProcessCommand(string& cmd, bool silent)
 {
-    // Разбор по 
+    // || case
     size_t pos;
-    while ((pos = cmd.find("")) != string::npos) {
+    while ((pos = cmd.find("||")) != string::npos) {
         string left = cmd.substr(0, pos);
         cmd = cmd.substr(pos + 2);
         if (DoCommand(left, silent) == 0)
             return;
     }
     
-   
+    // && case
     vector<string> andCmds;
     stringstream ss(cmd);
     string token;
@@ -94,7 +94,7 @@ void ProcessCommand(string& cmd, bool silent)
     }
     
     for (auto& c : andCmds) {
-   
+        // ; case
         stringstream ss2(c);
         string scmd;
         bool stop = false;
