@@ -1,5 +1,6 @@
 #include <iostream>
 #include <unistd.h>
+#include <limits>
 
 bool isPrime(int n) {
     if(n < 2) return false;
@@ -17,6 +18,13 @@ int nthPrime(int m) {
         if(isPrime(num)) count++;
     }
     return num;
+}
+
+bool validNumber(const std::string& s){
+    for(char c : s){
+        if(c < '0' || c > '9') return false;
+    }
+    return !s.empty();
 }
 
 int main(){
@@ -66,16 +74,39 @@ int main(){
                 write(p2c[1], &stop, sizeof(stop));
                 break;
             }
+            if(!validNumber(input)){
+                std::cout<<"Only positive numbers allowed!\n";
+                continue;
+            }
 
             int m = std::stoi(input);
 
-            std::cout << "[Parent] Sending " << m << " to the child process..." << std::endl;
-            write(p2c[1], &m, sizeof(m));
+            if(m <= 0){
+                std::cout<<"Number must be > 0\n";
+                continue;
+            }
 
+            if(m > 100000){
+                std::cout<<"Too big number! Max = 100000\n";
+                continue;
+            }
+
+            std::cout << "[Parent] Sending " << m << " to the child process..." << std::endl;
+
+            int w = write(p2c[1], &m, sizeof(m));
+            if(w <= 0){
+                std::cerr<<"Parent: write failed\n";
+                break;
+            }
+            
             std::cout << "[Parent] Waiting for the response from the child process..." << std::endl;
 
             int result;
-            read(c2p[0], &result, sizeof(result));
+            int r = read(c2p[0], &result, sizeof(result));
+                if(r <= 0){
+                std::cerr<<"Error while reading from child\n";
+                break;
+            }
 
             std::cout << "[Parent] Received calculation result of prime(" << m << ") = " << result << "..." << std::endl;
         }
